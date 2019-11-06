@@ -1,1 +1,81 @@
-Serving from Apache Server 1
+<!DOCTYPE html>
+<html lang="en">
+
+	Serving from Apache Server 1
+
+<div class="container">
+<!--    <pre style="background-color: #aaaaaa">--><!--</pre>-->
+<script src="https://cdn.rawgit.com/google/code-prettify/master/loader/run_prettify.js?autoload=true&amp;skin=sons-of-obsidian&amp;lang=css" defer="defer"></script><div class="page-header">
+            <h1>Creating a single HAProxy and two Apache containers with Docker compose</h1>
+            <p class="lead small">
+            03/02/2018 - DOCKER
+            </p>
+            </div><div style="padding: 10px 0px;"><p>In this example we are going to create two identical Apache servers and one HAProxy container. When we want to access our website, we will be calling HAProxy, not the Apache servers. HAProxy will divert traffic to Apache servers in "round-robin" fashion.</p><br />
+<h3>Flow</h3><br />
+<ol><li>Request goes to HAProxy container.</li><br /><li>HAProxy container calls either Apache container 1 or 2.</li><br /><li>Response is served by Apache container 1 or 2.</li></ol><br />
+<h3>Structure</h3><br />
+<div class="prettyprint_cover"><pre class="prettyprint linenums lang-rb">ubuntu@linux:~/helloworld$ tree -a<br />.<br />└── docker<br />    ├── apache<br />    │   ├── 1<br />    │   │   ├── Dockerfile<br />    │   │   └── index.html<br />    │   └── 2<br />    │       ├── Dockerfile<br />    │       └── index.html<br />    ├── docker-compose.yml<br />    ├── .env<br />    └── haproxy<br />        ├── Dockerfile<br />        └── haproxy.cfg<br /><br />5 directories, 8 files<br /></pre></div><br />
+<h3>Files</h3><br />
+<h4>docker/apache/1/Dockerfile</h4><br />
+<div class="prettyprint_cover"><pre class="prettyprint linenums lang-rb">ubuntu@linux:~/helloworld$ cat docker/apache/1/Dockerfile <br />FROM httpd:2.4<br /><br />COPY index.html /usr/local/apache2/htdocs/index.html<br /></pre></div><br />
+<h4>docker/apache/1/index.html</h4><br />
+<div class="prettyprint_cover"><pre class="prettyprint linenums lang-rb">ubuntu@linux:~/helloworld$ cat docker/apache/1/index.html <br />Serving from Apache Server 1<br /></pre></div><br />
+<h4>docker/apache/2/Dockerfile</h4><br />
+<div class="prettyprint_cover"><pre class="prettyprint linenums lang-rb">ubuntu@linux:~/helloworld$ cat docker/apache/2/Dockerfile <br />FROM httpd:2.4<br /><br />COPY index.html /usr/local/apache2/htdocs/index.html<br /></pre></div><br />
+<h4>docker/apache/2/index.html</h4><br />
+<div class="prettyprint_cover"><pre class="prettyprint linenums lang-rb">ubuntu@linux:~/helloworld$ cat docker/apache/2/index.html <br />Serving from Apache Server 2<br /></pre></div><br />
+<h4>docker/haproxy/Dockerfile</h4><br />
+<div class="prettyprint_cover"><pre class="prettyprint linenums lang-rb">ubuntu@linux:~/helloworld$ cat docker/haproxy/Dockerfile <br />FROM haproxy:1.7<br /><br />COPY haproxy.cfg /usr/local/etc/haproxy/haproxy.cfg<br /></pre></div><br />
+<h4>docker/haproxy/haproxy.cfg</h4><br />
+<p>You can access to HAProxy GUI via <code>http://host_os_ip/haproxy?stats</code> and login with <code>admin:admin</code>.</p><br />
+<div class="prettyprint_cover"><pre class="prettyprint linenums lang-rb">ubuntu@linux:~/helloworld$ cat docker/haproxy/haproxy.cfg <br />global<br />    log /dev/log local0<br />    log localhost local1 notice<br />    maxconn 2000<br />    daemon<br /><br />defaults<br />    log global<br />    mode http<br />    option httplog<br />    option dontlognull<br />    retries 3<br />    timeout connect 5000<br />    timeout client 50000<br />    timeout server 50000<br /><br />frontend http-in<br />    bind *:80<br />    default_backend webservers<br /><br />backend webservers<br />    stats enable<br />    stats auth admin:admin<br />    stats uri /haproxy?stats<br />    balance roundrobin<br />    option httpchk<br />    option forwardfor<br />    option http-server-close<br />    server apache1 ${APACHE_1_IP}:${APACHE_EXPOSED_PORT} check<br />    server apache2 ${APACHE_2_IP}:${APACHE_EXPOSED_PORT} check<br /></pre></div><br />
+<h4>docker/.env</h4><br />
+<div class="prettyprint_cover"><pre class="prettyprint linenums lang-rb">ubuntu@linux:~/helloworld$ cat docker/.env <br />COMPOSE_PROJECT_NAME=helloworld<br /><br />APACHE_EXPOSED_PORT=80<br /><br />APACHE_1_IP=192.168.0.11<br />APACHE_2_IP=192.168.0.22<br /><br />HA_PROXY_IP=192.168.0.33<br /><br />NETWORK_SUBNET=192.168.0.0/24<br /></pre></div><br />
+<h4>docker/docker-compose.yml</h4><br />
+<div class="prettyprint_cover"><pre class="prettyprint linenums lang-rb">ubuntu@linux:~/helloworld$ cat docker/docker-compose.yml <br />version: '3'<br /><br />services:<br />    apache_img_1:<br />        container_name: ${COMPOSE_PROJECT_NAME}_apache_con_1<br />        build: ./apache/1<br />        expose:<br />            - ${APACHE_EXPOSED_PORT}<br />        networks:<br />            public_net:<br />                ipv4_address: ${APACHE_1_IP}<br />    apache_img_2:<br />        container_name: ${COMPOSE_PROJECT_NAME}_apache_con_2<br />        build: ./apache/2<br />        expose:<br />            - ${APACHE_EXPOSED_PORT}<br />        networks:<br />            public_net:<br />                ipv4_address: ${APACHE_2_IP}<br />    haproxy_img:<br />        build: ./haproxy<br />        ports:<br />            - 80:80<br />        expose:<br />            - 80<br />        networks:<br />            public_net:<br />                ipv4_address: ${HA_PROXY_IP}<br />        environment:<br />            - APACHE_1_IP=${APACHE_1_IP}<br />            - APACHE_2_IP=${APACHE_2_IP}<br />            - APACHE_EXPOSED_PORT=${APACHE_EXPOSED_PORT}<br />networks:<br />    public_net:<br />        driver: bridge<br />        ipam:<br />            driver: default<br />            config:<br />                - subnet: ${NETWORK_SUBNET}<br /></pre></div><br />
+<h3>Validation</h3><br />
+<p>Validate "docker-compose.yml" file and see the mapping.</p><br />
+<div class="prettyprint_cover"><pre class="prettyprint linenums lang-rb">ubuntu@linux:~/helloworld/docker$ docker-compose config<br />networks:<br />  public_net:<br />    driver: bridge<br />    ipam:<br />      config:<br />      - subnet: 192.168.0.0/24<br />      driver: default<br />services:<br />  apache_img_1:<br />    build:<br />      context: /home/ubuntu/helloworld/docker/apache/1<br />    container_name: helloworld_apache_con_1<br />    expose:<br />    - '80'<br />    networks:<br />      public_net:<br />        ipv4_address: 192.168.0.11<br />  apache_img_2:<br />    build:<br />      context: /home/ubuntu/helloworld/docker/apache/2<br />    container_name: helloworld_apache_con_2<br />    expose:<br />    - '80'<br />    networks:<br />      public_net:<br />        ipv4_address: 192.168.0.22<br />  haproxy_img:<br />    build:<br />      context: /home/ubuntu/helloworld/docker/haproxy<br />    environment:<br />      APACHE_1_IP: 192.168.0.11<br />      APACHE_2_IP: 192.168.0.22<br />      APACHE_EXPOSED_PORT: '80'<br />    expose:<br />    - 80<br />    networks:<br />      public_net:<br />        ipv4_address: 192.168.0.33<br />    ports:<br />    - 80:80/tcp<br />version: '3.0'<br /></pre></div><br />
+<h3>Build</h3><br />
+<p>When you run command below without <code>-d</code> flag, you will see HAProxy pinging Apache servers every 1 seconds. This proves that our setup works fine.</p><br />
+<div class="prettyprint_cover"><pre class="prettyprint linenums lang-rb">ubuntu@linux:~/helloworld/docker$ docker-compose up<br /><br />Creating network "helloworld_public_net" with driver "bridge"<br />Building haproxy_img<br />Successfully tagged helloworld_haproxy_img:latest<br /><br />Building apache_img_2<br />Successfully tagged helloworld_apache_img_2:latest<br /><br />Building apache_img_1<br />Successfully tagged helloworld_apache_img_1:latest<br /><br />Creating helloworld_apache_con_1 ... done<br />Creating helloworld_apache_con_1 ... <br />Creating helloworld_apache_con_2 ... <br /><br />helloworld_apache_con_1 | 192.168.0.33 - - [03/Feb/2018:21:15:29 +0000] "OPTIONS / HTTP/1.0" 200 -<br />helloworld_apache_con_2 | 192.168.0.33 - - [03/Feb/2018:21:15:29 +0000] "OPTIONS / HTTP/1.0" 200 -<br />helloworld_apache_con_1 | 192.168.0.33 - - [03/Feb/2018:21:15:31 +0000] "OPTIONS / HTTP/1.0" 200 -<br />helloworld_apache_con_2 | 192.168.0.33 - - [03/Feb/2018:21:15:33 +0000] "OPTIONS / HTTP/1.0" 200 -<br />helloworld_apache_con_1 | 192.168.0.33 - - [03/Feb/2018:21:15:33 +0000] "OPTIONS / HTTP/1.0" 200 -<br />helloworld_apache_con_2 | 192.168.0.33 - - [03/Feb/2018:21:15:31 +0000] "OPTIONS / HTTP/1.0" 200 -<br />helloworld_apache_con_1 | 192.168.0.33 - - [03/Feb/2018:21:15:35 +0000] "OPTIONS / HTTP/1.0" 200 -<br />...<br /></pre></div><br />
+<p>You must configure Apache not to log pinging request coming from HAProxy otherwise Apache logs will be bloated quickly. If you want to see how it is done, head "HAProxy" section in my blog and apply what it says under "Webserver Logs" header.</p><br />
+<h3>Confirmation</h3><br />
+<p>If you want to see the details of each element, you can run <code>docker inspect</code> command.</p><br />
+<h4>Images</h4><br />
+<div class="prettyprint_cover"><pre class="prettyprint linenums lang-rb">ubuntu@linux:~$ docker images<br />REPOSITORY                TAG                 IMAGE ID            CREATED             SIZE<br />helloworld_apache_img_2   latest              6f63653a9e68        9 minutes ago       177MB<br />helloworld_haproxy_img    latest              363551ccafe6        9 minutes ago       136MB<br />helloworld_apache_img_1   latest              83bc617be089        9 minutes ago       177MB<br />...<br /></pre></div><br />
+<h4>Network</h4><br />
+<div class="prettyprint_cover"><pre class="prettyprint linenums lang-rb">ubuntu@linux:~$ docker network ls<br />NETWORK ID          NAME                    DRIVER              SCOPE<br />c72c538d9025        helloworld_public_net   bridge              local<br />...<br /></pre></div><br />
+<h4>Containers</h4><br />
+<div class="prettyprint_cover"><pre class="prettyprint linenums lang-rb">ubuntu@linux:~$ docker ps<br />CONTAINER ID        IMAGE                     COMMAND                  CREATED             STATUS              PORTS                NAMES<br />4e4291f3a95c        helloworld_apache_img_2   "httpd-foreground"       11 minutes ago      Up 11 minutes       80/tcp               helloworld_apache_con_2<br />ebba54230552        helloworld_apache_img_1   "httpd-foreground"       11 minutes ago      Up 11 minutes       80/tcp               helloworld_apache_con_1<br />a770b68939c5        helloworld_haproxy_img    "/docker-entrypoin..."   11 minutes ago      Up 11 minutes       0.0.0.0:80->80/tcp   helloworld_haproxy_img_1<br /></pre></div><br />
+<h3>Test</h3><br />
+<p>You can do benchmark with command below. It will send total of 10000 requests and 30 concurrent requests at a time. When you run this command, you can also run <code>htop</code> command in one of the Apache containers to see how CPU and Memory are used.</p><br />
+<div class="prettyprint_cover"><pre class="prettyprint linenums lang-rb">ubuntu@linux:~$ ab -n 10000 -c 30 http://192.168.0.33/<br /><br />This is ApacheBench, Version 2.3 &lt;$Revision: 1706008 $&gt;<br />Copyright 1996 Adam Twiss, Zeus Technology Ltd, http://www.zeustech.net/<br />Licensed to The Apache Software Foundation, http://www.apache.org/<br /><br />Benchmarking 192.168.0.33 (be patient)<br />Completed 1000 requests<br />Completed 2000 requests<br />Completed 3000 requests<br />Completed 4000 requests<br />Completed 5000 requests<br />Completed 6000 requests<br />Completed 7000 requests<br />Completed 8000 requests<br />Completed 9000 requests<br />Completed 10000 requests<br />Finished 10000 requests<br /><br />Server Software:        Apache/2.4.29<br />Server Hostname:        192.168.0.33<br />Server Port:            80<br /><br />Document Path:          /<br />Document Length:        29 bytes<br /><br />Concurrency Level:      30<br />Time taken for tests:   2.943 seconds<br />Complete requests:      10000<br />Failed requests:        0<br />Total transferred:      2730000 bytes<br />HTML transferred:       290000 bytes<br />Requests per second:    3397.93 [#/sec] (mean)<br />Time per request:       8.829 [ms] (mean)<br />Time per request:       0.294 [ms] (mean, across all concurrent requests)<br />Transfer rate:          905.89 [Kbytes/sec] received<br /><br />Connection Times (ms)<br />              min  mean[+/-sd] median   max<br />Connect:        0    0   0.3      0       6<br />Processing:     0    9   5.4      8     153<br />Waiting:        0    8   5.4      8     153<br />Total:          0    9   5.4      8     154<br /><br />Percentage of the requests served within a certain time (ms)<br />  50%      8<br />  66%      9<br />  75%      9<br />  80%     10<br />  90%     11<br />  95%     13<br />  98%     16<br />  99%     25<br /> 100%    154 (longest request)<br /></pre></div><br />
+<p>While both Apache servers are running.</p><br />
+<div class="prettyprint_cover"><pre class="prettyprint linenums lang-rb">ubuntu@linux:~$ for i in {1..10}; do curl 192.168.0.33:80; done<br /><br />Serving from Apache Server 1<br />Serving from Apache Server 2<br />Serving from Apache Server 1<br />Serving from Apache Server 2<br />...<br /></pre></div><br />
+<p>While only Apache 1 server is running.</p><br />
+<div class="prettyprint_cover"><pre class="prettyprint linenums lang-rb">ubuntu@linux:~$ for i in {1..10}; do curl 192.168.0.33:80; done<br /><br />Serving from Apache Server 1<br />Serving from Apache Server 1<br />Serving from Apache Server 1<br />Serving from Apache Server 1<br />...<br /></pre></div><br />
+<p>While only Apache 2 server is running.</p><br />
+<div class="prettyprint_cover"><pre class="prettyprint linenums lang-rb">ubuntu@linux:~$ for i in {1..10}; do curl 192.168.0.33:80; done<br /><br />Serving from Apache Server 2<br />Serving from Apache Server 2<br />Serving from Apache Server 2<br />Serving from Apache Server 2<br />...<br /></pre></div><br />
+<p>Apache servers are down.</p><br />
+<div class="prettyprint_cover"><pre class="prettyprint linenums lang-rb">ubuntu@linux:~$ curl 192.168.0.33:80<br /><br />&lt;html&gt;&lt;body&gt;&lt;h1&gt;503 Service Unavailable&lt;/h1&gt;<br />No server is available to handle this request.<br />&lt;/body&gt;&lt;/html&gt;<br /></pre></div></div><br /></div><!-- /.container -->
+
+<footer class="footer">
+    <div class="container">
+        <p class="text-muted">
+            &copy; 2014 &dash; 2019 inanzzz.com        </p>
+    </div>
+</footer>
+
+<!-- Bootstrap core JavaScript -->
+<!-- Placed at the end of the document so the pages load faster -->
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
+<script src="https://getbootstrap.com/docs/3.3/dist/js/bootstrap.min.js"></script>
+<!-- IE10 viewport hack for Surface/desktop Windows 8 bug -->
+<script src="http://getbootstrap.com/assets/js/ie10-viewport-bug-workaround.js"></script>
+<!-- Local JS -->
+<script src="http://www.inanzzz.com/asset/js/site.js" type="text/javascript"></script>
+
+</body>
+</html>
+
