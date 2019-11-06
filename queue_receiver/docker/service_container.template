@@ -1,0 +1,9 @@
+    queue_receiver_{index}:
+        container_name: ${{COMPOSE_PROJECT_NAME}}_con_{index}
+        image: queue_receiver:latest
+        expose:
+            - ${{QUEUE_RECEIVER_EXPOSED_PORT}}
+        networks:
+            public_net:
+                ipv4_address: ${{QUEUE_RECEIVER_{index}_IP}}
+

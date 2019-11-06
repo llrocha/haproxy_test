@@ -1,0 +1,1 @@
+            - QUEUE_RECEIVER_{index}_IP=${{QUEUE_RECEIVER_{index}_IP}}

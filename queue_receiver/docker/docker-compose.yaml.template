@@ -1,0 +1,23 @@
+version: '3'
+ 
+services:
+{service_container}
+    haproxy_img:
+        build: ./haproxy
+        ports:
+            - 80:80
+        expose:
+            - 80
+        networks:
+            public_net:
+                ipv4_address: ${{HA_PROXY_IP}}
+        environment:
+            - QUEUE_RECEIVER_EXPOSED_PORT=${{QUEUE_RECEIVER_EXPOSED_PORT}}
+{service_ips}
+networks:
+    public_net:
+        driver: bridge
+        ipam:
+            driver: default
+            config:
+                - subnet: ${{NETWORK_SUBNET}}

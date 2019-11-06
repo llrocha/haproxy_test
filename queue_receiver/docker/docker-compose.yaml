@@ -1,0 +1,123 @@
+version: '3'
+ 
+services:
+    queue_receiver_0:
+        container_name: ${COMPOSE_PROJECT_NAME}_con_0
+        image: queue_receiver:latest
+        expose:
+            - ${QUEUE_RECEIVER_EXPOSED_PORT}
+        networks:
+            public_net:
+                ipv4_address: ${QUEUE_RECEIVER_0_IP}
+
+    queue_receiver_1:
+        container_name: ${COMPOSE_PROJECT_NAME}_con_1
+        image: queue_receiver:latest
+        expose:
+            - ${QUEUE_RECEIVER_EXPOSED_PORT}
+        networks:
+            public_net:
+                ipv4_address: ${QUEUE_RECEIVER_1_IP}
+
+    queue_receiver_2:
+        container_name: ${COMPOSE_PROJECT_NAME}_con_2
+        image: queue_receiver:latest
+        expose:
+            - ${QUEUE_RECEIVER_EXPOSED_PORT}
+        networks:
+            public_net:
+                ipv4_address: ${QUEUE_RECEIVER_2_IP}
+
+    queue_receiver_3:
+        container_name: ${COMPOSE_PROJECT_NAME}_con_3
+        image: queue_receiver:latest
+        expose:
+            - ${QUEUE_RECEIVER_EXPOSED_PORT}
+        networks:
+            public_net:
+                ipv4_address: ${QUEUE_RECEIVER_3_IP}
+
+    queue_receiver_4:
+        container_name: ${COMPOSE_PROJECT_NAME}_con_4
+        image: queue_receiver:latest
+        expose:
+            - ${QUEUE_RECEIVER_EXPOSED_PORT}
+        networks:
+            public_net:
+                ipv4_address: ${QUEUE_RECEIVER_4_IP}
+
+    queue_receiver_5:
+        container_name: ${COMPOSE_PROJECT_NAME}_con_5
+        image: queue_receiver:latest
+        expose:
+            - ${QUEUE_RECEIVER_EXPOSED_PORT}
+        networks:
+            public_net:
+                ipv4_address: ${QUEUE_RECEIVER_5_IP}
+
+    queue_receiver_6:
+        container_name: ${COMPOSE_PROJECT_NAME}_con_6
+        image: queue_receiver:latest
+        expose:
+            - ${QUEUE_RECEIVER_EXPOSED_PORT}
+        networks:
+            public_net:
+                ipv4_address: ${QUEUE_RECEIVER_6_IP}
+
+    queue_receiver_7:
+        container_name: ${COMPOSE_PROJECT_NAME}_con_7
+        image: queue_receiver:latest
+        expose:
+            - ${QUEUE_RECEIVER_EXPOSED_PORT}
+        networks:
+            public_net:
+                ipv4_address: ${QUEUE_RECEIVER_7_IP}
+
+    queue_receiver_8:
+        container_name: ${COMPOSE_PROJECT_NAME}_con_8
+        image: queue_receiver:latest
+        expose:
+            - ${QUEUE_RECEIVER_EXPOSED_PORT}
+        networks:
+            public_net:
+                ipv4_address: ${QUEUE_RECEIVER_8_IP}
+
+    queue_receiver_9:
+        container_name: ${COMPOSE_PROJECT_NAME}_con_9
+        image: queue_receiver:latest
+        expose:
+            - ${QUEUE_RECEIVER_EXPOSED_PORT}
+        networks:
+            public_net:
+                ipv4_address: ${QUEUE_RECEIVER_9_IP}
+
+
+    haproxy:
+        build: ./haproxy
+        ports:
+            - 8000:8000
+        expose:
+            - 8000
+        networks:
+            public_net:
+                ipv4_address: ${HA_PROXY_IP}
+        environment:
+            - QUEUE_RECEIVER_EXPOSED_PORT=${QUEUE_RECEIVER_EXPOSED_PORT}
+            - QUEUE_RECEIVER_0_IP=${QUEUE_RECEIVER_0_IP}
+            - QUEUE_RECEIVER_1_IP=${QUEUE_RECEIVER_1_IP}
+            - QUEUE_RECEIVER_2_IP=${QUEUE_RECEIVER_2_IP}
+            - QUEUE_RECEIVER_3_IP=${QUEUE_RECEIVER_3_IP}
+            - QUEUE_RECEIVER_4_IP=${QUEUE_RECEIVER_4_IP}
+            - QUEUE_RECEIVER_5_IP=${QUEUE_RECEIVER_5_IP}
+            - QUEUE_RECEIVER_6_IP=${QUEUE_RECEIVER_6_IP}
+            - QUEUE_RECEIVER_7_IP=${QUEUE_RECEIVER_7_IP}
+            - QUEUE_RECEIVER_8_IP=${QUEUE_RECEIVER_8_IP}
+            - QUEUE_RECEIVER_9_IP=${QUEUE_RECEIVER_9_IP}
+
+networks:
+    public_net:
+        driver: bridge
+        ipam:
+            driver: default
+            config:
+                - subnet: ${NETWORK_SUBNET}
